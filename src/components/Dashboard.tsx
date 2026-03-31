@@ -5,9 +5,10 @@ import { Progress } from "./ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Package, Users, Percent, TrendingUp, Download, Loader2 } from "lucide-react";
+import { Package, Users, Percent, TrendingUp, Download, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "./ui/button";
 import { supabase, SalesDataRow } from "../lib/supabase";
+import AdminForm from "./AdminForm";
 
 type Product = "Kombucha" | "Mpills" | "Other";
 type Team = "Akvizice" | "Retence";
@@ -33,6 +34,11 @@ export default function Dashboard() {
   const [salesData, setSalesData] = useState<SalesRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refreshData = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const today = new Date();
 
@@ -70,7 +76,7 @@ export default function Dashboard() {
     }
 
     fetchSalesData();
-  }, []);
+  }, [refreshKey]);
 
   const filteredData = useMemo(() => {
     return salesData.filter((record) => {
@@ -221,6 +227,10 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
           
+          <Button variant="outline" size="icon" onClick={refreshData} title="Refresh data">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          
           <Button variant="outline" size="icon" onClick={handleExportCSV} title="Export do CSV">
             <Download className="h-4 w-4" />
           </Button>
@@ -360,6 +370,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <AdminForm onDataAdded={refreshData} />
     </div>
   );
 }
