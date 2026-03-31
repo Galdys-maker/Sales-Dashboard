@@ -12,7 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface SalesDataRow {
   id: number;
   date: string;
-  caller_name: string;
+  name: string;
   team: string;
   product: string;
   contacts: number;

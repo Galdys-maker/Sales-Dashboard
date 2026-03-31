@@ -63,7 +63,7 @@ export default function Dashboard() {
         const formattedData: SalesRecord[] = data.map((row: SalesDataRow) => ({
           id: row.id,
           date: row.date,
-          callerName: row.caller_name,
+          callerName: row.name,
           team: row.team as Team,
           product: row.product as Product,
           contacts: row.contacts,

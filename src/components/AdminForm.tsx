@@ -40,7 +40,7 @@ export default function AdminForm({ onDataAdded }: AdminFormProps) {
     const { error: insertError } = await supabase
       .from("sales_data")
       .insert({
-        caller_name: name,
+        name: name,
         date: date,
         contacts: parseInt(contacts, 10),
         boxes: parseInt(boxes, 10),
