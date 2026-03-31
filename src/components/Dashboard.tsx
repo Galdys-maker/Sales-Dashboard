@@ -1,14 +1,27 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { format, isSameDay, isSameWeek, isSameMonth, parseISO } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Badge } from "./ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import { MOCK_DATA, SalesRecord, Product, Team } from "../data/mockData";
-import { ArrowUpRight, ArrowDownRight, Package, Users, Percent, TrendingUp, Download } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Package, Users, Percent, TrendingUp, Download, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "./ui/button";
+import { supabase, SalesDataRow } from "../lib/supabase";
+import AdminForm from "./AdminForm";
+
+type Product = "Kombucha" | "Mpills" | "Other";
+type Team = "Akvizice" | "Retence";
+
+interface SalesRecord {
+  id: number;
+  date: string;
+  callerName: string;
+  team: Team;
+  product: Product;
+  contacts: number;
+  boxes: number;
+}
 
 const TARGET_BOXES_DAILY = 50;
 const TARGET_BOXES_WEEKLY = 250;
@@ -18,11 +31,55 @@ export default function Dashboard() {
   const [period, setPeriod] = useState<"today" | "week" | "month">("today");
   const [productFilter, setProductFilter] = useState<Product | "All">("All");
   const [teamFilter, setTeamFilter] = useState<Team | "All">("All");
+  const [salesData, setSalesData] = useState<SalesRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refreshData = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
 
   const today = new Date();
 
+  // Fetch data from Supabase
+  useEffect(() => {
+    async function fetchSalesData() {
+      setLoading(true);
+      setError(null);
+      
+      const { data, error: fetchError } = await supabase
+        .from("sales_data")
+        .select("*");
+
+      if (fetchError) {
+        console.error("Error fetching sales data:", fetchError);
+        setError(fetchError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        const formattedData: SalesRecord[] = data.map((row: SalesDataRow) => ({
+          id: row.id,
+          date: row.date,
+          callerName: row.caller_name,
+          team: row.team as Team,
+          product: row.product as Product,
+          contacts: row.contacts,
+          boxes: row.boxes,
+        }));
+        setSalesData(formattedData);
+      }
+      
+      setLoading(false);
+    }
+
+    fetchSalesData();
+  }, [refreshKey]);
+
   const filteredData = useMemo(() => {
-    return MOCK_DATA.filter((record) => {
+    return salesData.filter((record) => {
       const recordDate = parseISO(record.date);
       
       let dateMatch = false;
@@ -39,7 +96,7 @@ export default function Dashboard() {
 
       return dateMatch && productMatch && teamMatch;
     });
-  }, [period, productFilter, teamFilter]);
+  }, [salesData, period, productFilter, teamFilter]);
 
   const kpis = useMemo(() => {
     const totalBoxes = filteredData.reduce((sum, r) => sum + r.boxes, 0);
@@ -65,7 +122,7 @@ export default function Dashboard() {
       return acc;
     }, {} as Record<string, { date: string; boxes: number; contacts: number }>);
 
-    return Object.values(groupedByDate).sort((a: any, b: any) => a.date.localeCompare(b.date));
+    return Object.values(groupedByDate).sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredData]);
 
   const topPerformers = useMemo(() => {
@@ -79,7 +136,7 @@ export default function Dashboard() {
     }, {} as Record<string, { name: string; boxes: number; contacts: number }>);
 
     return Object.values(groupedByCaller)
-      .sort((a: any, b: any) => b.boxes - a.boxes)
+      .sort((a, b) => b.boxes - a.boxes)
       .slice(0, 5);
   }, [filteredData]);
 
@@ -109,12 +166,34 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading sales data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <p className="text-destructive font-medium">Error loading data</p>
+          <p className="text-muted-foreground text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 space-y-6 p-6 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
         <h2 className="text-3xl font-bold tracking-tight">Sales Dashboard</h2>
         <div className="flex flex-wrap items-center space-x-2 gap-y-2">
-          <Select value={period} onValueChange={(v: any) => setPeriod(v)}>
+          <Select value={period} onValueChange={(v: "today" | "week" | "month") => setPeriod(v)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Období" />
             </SelectTrigger>
@@ -125,7 +204,7 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
           
-          <Select value={productFilter} onValueChange={(v: any) => setProductFilter(v)}>
+          <Select value={productFilter} onValueChange={(v: Product | "All") => setProductFilter(v)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Produkt" />
             </SelectTrigger>
@@ -137,7 +216,7 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
 
-          <Select value={teamFilter} onValueChange={(v: any) => setTeamFilter(v)}>
+          <Select value={teamFilter} onValueChange={(v: Team | "All") => setTeamFilter(v)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Tým" />
             </SelectTrigger>
@@ -147,6 +226,10 @@ export default function Dashboard() {
               <SelectItem value="Retence">Retence</SelectItem>
             </SelectContent>
           </Select>
+          
+          <Button variant="outline" size="icon" onClick={refreshData} title="Refresh data">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           
           <Button variant="outline" size="icon" onClick={handleExportCSV} title="Export do CSV">
             <Download className="h-4 w-4" />
@@ -199,7 +282,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {Math.round(kpis.totalBoxes * 1.15)} {/* Simple mock forecast */}
+              {Math.round(kpis.totalBoxes * 1.15)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Očekávaný výsledek
@@ -256,7 +339,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-6">
               {topPerformers.map((performer, i) => {
-                const individualTarget = kpis.target / 5; // Mock individual target
+                const individualTarget = kpis.target / 5;
                 const perfColor = getPerformanceColor(performer.boxes, individualTarget);
                 
                 return (
@@ -268,12 +351,12 @@ export default function Dashboard() {
                       <p className="text-sm font-medium leading-none">{performer.name}</p>
                       <div className="flex items-center text-xs text-muted-foreground">
                         <span className="mr-2">{performer.contacts} kontaktů</span>
-                        <span>{((performer.boxes / performer.contacts) * 100).toFixed(1)}% konverze</span>
+                        <span>{performer.contacts > 0 ? ((performer.boxes / performer.contacts) * 100).toFixed(1) : "0.0"}% konverze</span>
                       </div>
                     </div>
                     <div className="ml-auto font-medium flex items-center gap-2">
                       <span className="text-xl">{performer.boxes}</span>
-                      <Badge variant={perfColor as any} className="w-2 h-2 p-0 rounded-full" />
+                      <Badge variant={perfColor as "gold" | "success" | "warning" | "destructive"} className="w-2 h-2 p-0 rounded-full" />
                     </div>
                   </div>
                 );
@@ -287,6 +370,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <AdminForm onDataAdded={refreshData} />
     </div>
   );
 }
