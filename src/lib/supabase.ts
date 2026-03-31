@@ -11,7 +11,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface SalesDataRow {
   id: number;
-  date: string;
+  data: string;
   name: string;
   team: string;
   product: string;
