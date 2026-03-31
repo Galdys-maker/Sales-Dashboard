@@ -41,7 +41,7 @@ export default function AdminForm({ onDataAdded }: AdminFormProps) {
       .from("sales_data")
       .insert({
         name: name,
-        date: date,
+        data: date,
         contacts: parseInt(contacts, 10),
         boxes: parseInt(boxes, 10),
         team: team,
